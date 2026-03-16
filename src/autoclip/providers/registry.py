@@ -36,6 +36,7 @@ def _create_whisper_provider(config: AppConfig) -> ASRProvider:
         beam_size=asr_cfg.beam_size,
         vad_filter=asr_cfg.vad_filter,
         min_silence_duration_ms=asr_cfg.min_silence_duration_ms,
+        hallucination_threshold=asr_cfg.hallucination_threshold,
     )
 
 
@@ -49,6 +50,7 @@ def _create_mlx_whisper_provider(config: AppConfig) -> ASRProvider:
         beam_size=asr_cfg.beam_size,
         vad_filter=asr_cfg.vad_filter,
         min_silence_duration_ms=asr_cfg.min_silence_duration_ms,
+        hallucination_threshold=asr_cfg.hallucination_threshold,
     )
 
 

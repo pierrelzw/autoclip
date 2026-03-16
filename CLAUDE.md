@@ -52,6 +52,13 @@ src/autoclip/
 - **CLI 4 分类** (用户简化): filler, repeat (含 stutter+repeat), false-start, pause
 - `false-start` 阈值为 `max(user_threshold, 0.85)` (0.85 为不可降低的下限，误判代价大)，其他类别使用用户阈值 (默认 **0.7**)
 
+### ASR 幻觉过滤
+- faster-whisper 会输出 `no_speech_prob` 字段，高值表示该段可能不是真实语音
+- 阈值设为 **0.9**（仅过滤近乎确定的幻觉），旧值 0.6 过于激进，会误删中文语音、背景音乐场景下的真实内容
+- VAD filter (`vad_filter=True`) 已在模型层处理非语音检测，hallucination filter 只是最后兜底
+- 可通过配置 `asr.hallucination_threshold` 调整（范围 0.0-1.0）
+- 过滤时输出 INFO 日志（时间范围 + no_speech_prob），便于 `-v` 诊断
+
 ### 同步架构
 MVP 使用同步调用，不用 async。faster-whisper 是 CPU 同步，FFmpeg 是 subprocess，LLM 用同步 OpenAI SDK。
 
