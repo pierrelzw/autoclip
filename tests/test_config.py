@@ -30,7 +30,7 @@ class TestDefaults:
     def test_default_llm(self) -> None:
         cfg = LLMConfig()
         assert cfg.provider == "ollama"
-        assert cfg.model == "qwen2.5:7b"
+        assert cfg.model == "qwen2.5:7b-instruct"
         assert cfg.temperature == 0.1
 
     def test_default_clean(self) -> None:

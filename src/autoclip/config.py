@@ -24,7 +24,7 @@ class LLMConfig(BaseModel, frozen=True):
     """LLM provider configuration."""
 
     provider: str = "ollama"
-    model: str = "qwen2.5:7b"
+    model: str = "qwen2.5:7b-instruct"
     base_url: str = "http://localhost:11434/v1"
     temperature: float = 0.1
     api_key: str = ""

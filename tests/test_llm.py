@@ -23,7 +23,7 @@ class TestOllamaProvider:
         mock_response.choices[0].message.content = '[{"word_id": "w_0", "reason": "stutter"}]'
         mock_client.chat.completions.create.return_value = mock_response
 
-        provider = OllamaProvider(model="qwen2.5:7b")
+        provider = OllamaProvider(model="qwen2.5:7b-instruct")
         result = provider.complete("test prompt")
         assert "stutter" in result
 

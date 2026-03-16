@@ -11,7 +11,7 @@ asr:
 
 llm:
   provider: ollama          # LLM provider: "ollama" or "openai"
-  model: qwen2.5:7b         # Model name
+  model: qwen2.5:7b-instruct         # Model name
   base_url: http://localhost:11434/v1  # Ollama API endpoint
   temperature: 0.1          # Sampling temperature
   # api_key: sk-...         # Required for OpenAI provider

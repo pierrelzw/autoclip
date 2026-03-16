@@ -68,10 +68,11 @@ def _check_ollama(config: AppConfig) -> None:
 
     models = [m.get("name", "") for m in data.get("models", [])]
     model_name = config.llm.model
-    # Check both exact match and without tag
-    if not any(model_name in m for m in models):
+    # Exact match against available model names
+    if model_name not in models:
         console.print(
             f"[red]Error:[/red] Ollama model '{model_name}' not found.\n"
+            f"Available models: {', '.join(models)}\n"
             f"Pull it with: [bold]ollama pull {model_name}[/bold]"
         )
         sys.exit(1)
@@ -308,9 +309,13 @@ def clean(
             with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console, transient=True) as progress:
                 progress.add_task("Classifying disfluencies...", total=None)
                 prompt = build_cleanup_prompt(words_with_pauses)
-                llm = create_llm_provider(config)
-                response = llm.complete(prompt, temperature=config.llm.temperature)
-                llm_candidates = parse_cleanup_response(response)
+                try:
+                    llm = create_llm_provider(config)
+                    response = llm.complete(prompt, temperature=config.llm.temperature)
+                    llm_candidates = parse_cleanup_response(response)
+                except (RuntimeError, ValueError) as e:
+                    console.print(f"[yellow]Warning:[/yellow] LLM classification failed: {e}")
+                    console.print("[dim]Continuing with filler and pause detection only.[/dim]")
 
         # Merge all candidates
         all_candidates = filler_candidates + pause_candidates + llm_candidates
