@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+import httpx
 from openai import OpenAI
 
 logger = logging.getLogger(__name__)
@@ -21,6 +22,7 @@ class OllamaProvider:
         self._client = OpenAI(
             base_url=base_url,
             api_key="ollama",  # Ollama doesn't require a real key
+            http_client=httpx.Client(trust_env=False),
         )
 
     def complete(

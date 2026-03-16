@@ -55,9 +55,10 @@ def _check_ollama(config: AppConfig) -> None:
 
     base_url = config.llm.base_url.replace("/v1", "")
     try:
-        resp = httpx.get(f"{base_url}/api/tags", timeout=5.0)
-        resp.raise_for_status()
-        data = resp.json()
+        with httpx.Client(trust_env=False) as client:
+            resp = client.get(f"{base_url}/api/tags", timeout=5.0)
+            resp.raise_for_status()
+            data = resp.json()
     except Exception:
         console.print(
             "[red]Error:[/red] Cannot connect to Ollama. "
