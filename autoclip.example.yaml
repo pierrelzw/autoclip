@@ -1,0 +1,29 @@
+# AutoClip Configuration
+# Copy to ~/.config/autoclip/config.yaml or ./autoclip.yaml
+
+asr:
+  provider: whisper         # ASR provider (currently only "whisper")
+  model: large-v3           # Whisper model: tiny, base, small, medium, large-v3
+  language: auto            # Language code or "auto" for detection
+  vad_filter: true          # Enable Silero VAD pre-filtering
+  beam_size: 5              # Beam search size
+  min_silence_duration_ms: 500  # VAD min silence duration
+
+llm:
+  provider: ollama          # LLM provider: "ollama" or "openai"
+  model: qwen2.5:7b         # Model name
+  base_url: http://localhost:11434/v1  # Ollama API endpoint
+  temperature: 0.1          # Sampling temperature
+  # api_key: sk-...         # Required for OpenAI provider
+
+clean:
+  auto_apply_threshold: 0.7   # Confidence threshold (0.0-1.0)
+  categories:                  # Categories to remove
+    - filler
+    - repeat
+    - false-start
+    - pause
+  long_pause_ms: 500           # Minimum pause duration to detect
+
+output:
+  dir: ./output               # Output directory
