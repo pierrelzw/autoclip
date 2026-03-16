@@ -10,9 +10,15 @@ from pydantic import BaseModel, Field
 
 
 class ASRConfig(BaseModel, frozen=True):
-    """ASR provider configuration."""
+    """ASR provider configuration.
 
-    provider: str = "whisper"
+    Provider options:
+        - "whisper": faster-whisper (CPU/CUDA)
+        - "mlx-whisper": mlx-whisper (Apple Silicon only)
+        - "auto": auto-detect best available engine
+    """
+
+    provider: str = "auto"
     model: str = "large-v3"
     language: str = "auto"
     vad_filter: bool = True
