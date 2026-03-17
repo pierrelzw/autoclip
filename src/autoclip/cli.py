@@ -443,15 +443,15 @@ def clean(
         write_analysis_json(analysis_result, analysis_json_path)
 
         # Generate HTML report if requested
-        report_path: str | None = None
+        export_report_path: str | None = None
         if report:
-            report_path = os.path.join(out_dir, f"{stem}_report.html")
-            video_src = _resolve_video_path_for_report(video_path, report_path, downloaded)
+            export_report_path = os.path.join(out_dir, f"{stem}_report.html")
+            video_src = _resolve_video_path_for_report(video_path, export_report_path, downloaded)
             html_content = generate_report_html(analysis_result, video_src)
-            with open(report_path, "w", encoding="utf-8") as f:
+            with open(export_report_path, "w", encoding="utf-8") as f:
                 f.write(html_content)
 
-        _print_export_summary(result, output_path, json_path, report_path)
+        _print_export_summary(result, output_path, json_path, export_report_path)
 
     finally:
         # Cleanup temp audio

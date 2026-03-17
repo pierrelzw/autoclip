@@ -29,7 +29,9 @@ def generate_report_html(
         Complete HTML string.
     """
     data_json = analysis.model_dump_json()
-    return _build_html(data_json, video_relative_path)
+    # Escape </script> sequences to prevent breaking out of inline <script> tags
+    safe_json = data_json.replace("</", "<\\/")
+    return _build_html(safe_json, video_relative_path)
 
 
 def _build_html(data_json: str, video_relative_path: str) -> str:
@@ -271,9 +273,13 @@ def _js() -> str:
     html += '<div class="content-right"><div class="card">';
     html += '<h2>Video Preview</h2>';
     html += '<div class="video-wrapper">';
-    html += '<video id="video-player" controls preload="metadata" src="' + escAttr(videoPath) + '">';
-    html += '</video>';
-    html += '<div class="video-fallback" style="display:none" id="video-fallback">Video not available. Place the original video file at: ' + escHtml(videoPath) + '</div>';
+    if (videoPath) {
+        html += '<video id="video-player" controls preload="metadata" src="' + escAttr(videoPath) + '">';
+        html += '</video>';
+        html += '<div class="video-fallback" style="display:none" id="video-fallback">Video not available. Place the original video file at: ' + escHtml(videoPath) + '</div>';
+    } else {
+        html += '<div class="video-fallback" id="video-fallback">Video preview not available (source was a URL).</div>';
+    }
     html += '</div>';
     html += '</div></div>';
 
