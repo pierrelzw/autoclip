@@ -69,6 +69,30 @@ class AutoRemovalCandidate(BaseModel, frozen=True):
     end_sec: float
 
 
+class AnalysisCandidate(AutoRemovalCandidate, frozen=True):
+    """A removal candidate with source tracking for analysis reports."""
+
+    source: Literal["keyword", "heuristic", "llm"]
+
+
+class AppliedParams(BaseModel, frozen=True):
+    """Parameters applied during the clean operation."""
+
+    threshold: float
+    categories: list[str]
+
+
+class AnalysisResult(BaseModel, frozen=True):
+    """Full analysis result for persistence and report generation."""
+
+    source: str
+    original_duration_sec: float
+    detected_language: str
+    words: tuple[WordToken, ...]
+    candidates: tuple[AnalysisCandidate, ...]
+    applied_params: AppliedParams
+
+
 class Segment(BaseModel, frozen=True):
     """A retained time segment for export."""
 

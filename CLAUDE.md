@@ -13,7 +13,7 @@ AutoClip 是一个本地运行的 CLI 工具，自动去除口播视频中的口
 - **构建**: hatchling
 - **CLI**: Click
 - **数据模型**: Pydantic v2
-- **ASR**: faster-whisper (word_timestamps)
+- **ASR**: faster-whisper / mlx-whisper (word_timestamps, auto-detect)
 - **LLM**: Ollama (默认, via OpenAI SDK) / OpenAI API (可选)
 - **媒体处理**: FFmpeg + ffprobe (系统依赖)
 - **下载**: yt-dlp
@@ -33,11 +33,14 @@ src/autoclip/
 ├── providers/              # ASR + LLM 抽象
 │   ├── types.py            # ASRProvider / LLMProvider Protocol
 │   ├── registry.py         # 工厂
-│   ├── asr/whisper_local.py
+│   ├── asr/{whisper_local,mlx_whisper_local}.py
 │   └── llm/{ollama_local,openai_cloud}.py
 ├── processing/             # 核心算法
 │   ├── finecut.py          # 分词编辑核心 (normalize, detect_fillers, detect_pauses, parse_cleanup_response, apply_removals, merge)
 │   └── prompts.py          # LLM 分类 prompt
+├── reporting/              # 分析报告
+│   ├── analysis.py         # JSON 分析结果导出
+│   └── html.py             # HTML 可视化报告
 └── media/                  # 媒体处理
     ├── ffmpeg.py           # 音频提取 + concat 导出
     ├── probe.py            # ffprobe 元数据

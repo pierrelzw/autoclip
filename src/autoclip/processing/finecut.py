@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Sequence
 
 from autoclip.models import (
+    AnalysisCandidate,
     AutoRemovalCandidate,
     CaptionSegment,
     RemovalReason,
@@ -54,7 +56,7 @@ def normalize_whisper_words(segments: list[CaptionSegment]) -> list[WordToken]:
 def detect_fillers(
     words: list[WordToken],
     language: str = "en",
-) -> list[AutoRemovalCandidate]:
+) -> list[AnalysisCandidate]:
     """Detect filler words via keyword matching.
 
     Args:
@@ -62,23 +64,24 @@ def detect_fillers(
         language: Language code for filler word list.
 
     Returns:
-        List of filler removal candidates with confidence=1.0.
+        List of filler removal candidates with confidence=1.0 and source="keyword".
     """
     # Combine all known filler sets (fallback to en)
     filler_set = FILLER_WORDS.get(language, FILLER_WORDS["en"])
 
-    candidates: list[AutoRemovalCandidate] = []
+    candidates: list[AnalysisCandidate] = []
     for word in words:
         normalized_text = word.text.lower().strip()
         if normalized_text in filler_set:
             candidates.append(
-                AutoRemovalCandidate(
+                AnalysisCandidate(
                     word_id=word.id,
                     text=word.text,
                     reason=RemovalReason.FILLER,
                     confidence=1.0,
                     start_sec=word.start_sec,
                     end_sec=word.end_sec,
+                    source="keyword",
                 )
             )
 
@@ -88,7 +91,7 @@ def detect_fillers(
 def detect_pauses(
     words: list[WordToken],
     long_pause_ms: int = 500,
-) -> tuple[list[WordToken], list[AutoRemovalCandidate]]:
+) -> tuple[list[WordToken], list[AnalysisCandidate]]:
     """Detect long pauses between words and insert synthetic [PAUSE] tokens.
 
     Args:
@@ -103,7 +106,7 @@ def detect_pauses(
 
     threshold_sec = long_pause_ms / 1000.0
     result_words: list[WordToken] = [words[0]]
-    candidates: list[AutoRemovalCandidate] = []
+    candidates: list[AnalysisCandidate] = []
     pause_idx = 0
 
     for i in range(1, len(words)):
@@ -118,13 +121,14 @@ def detect_pauses(
             )
             result_words.append(pause_token)
             candidates.append(
-                AutoRemovalCandidate(
+                AnalysisCandidate(
                     word_id=pause_id,
                     text="[PAUSE]",
                     reason=RemovalReason.LONG_PAUSE,
                     confidence=1.0,
                     start_sec=words[i - 1].end_sec,
                     end_sec=words[i].start_sec,
+                    source="heuristic",
                 )
             )
             pause_idx += 1
@@ -133,7 +137,7 @@ def detect_pauses(
     return result_words, candidates
 
 
-def parse_cleanup_response(response: str) -> list[AutoRemovalCandidate]:
+def parse_cleanup_response(response: str) -> list[AnalysisCandidate]:
     """Parse LLM cleanup response into removal candidates.
 
     Expected format: JSON array of objects with word_id, reason, confidence.
@@ -142,7 +146,7 @@ def parse_cleanup_response(response: str) -> list[AutoRemovalCandidate]:
         response: Raw LLM response text.
 
     Returns:
-        List of AutoRemovalCandidate. Empty on parse failure (fail-safe).
+        List of AnalysisCandidate with source="llm". Empty on parse failure (fail-safe).
     """
     # Try to extract JSON from response (may be wrapped in markdown code blocks)
     text = response.strip()
@@ -176,7 +180,7 @@ def parse_cleanup_response(response: str) -> list[AutoRemovalCandidate]:
         "false_start": RemovalReason.FALSE_START,
     }
 
-    candidates: list[AutoRemovalCandidate] = []
+    candidates: list[AnalysisCandidate] = []
     for item in data:
         if not isinstance(item, dict):
             continue
@@ -192,13 +196,14 @@ def parse_cleanup_response(response: str) -> list[AutoRemovalCandidate]:
 
         try:
             candidates.append(
-                AutoRemovalCandidate(
+                AnalysisCandidate(
                     word_id=str(word_id),
                     text=item.get("text", ""),
                     reason=reason,
                     confidence=float(confidence),
                     start_sec=float(item.get("start_sec", 0.0)),
                     end_sec=float(item.get("end_sec", 0.0)),
+                    source="llm",
                 )
             )
         except (ValueError, TypeError) as e:
@@ -210,7 +215,7 @@ def parse_cleanup_response(response: str) -> list[AutoRemovalCandidate]:
 
 def apply_removals(
     words: list[WordToken],
-    candidates: list[AutoRemovalCandidate],
+    candidates: Sequence[AutoRemovalCandidate],
     threshold: float = 0.7,
     categories: list[str] | None = None,
 ) -> tuple[list[WordToken], list[AutoRemovalCandidate]]:

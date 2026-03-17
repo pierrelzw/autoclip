@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,9 @@ from autoclip.media.probe import probe_video
 from autoclip.models import (
     ALL_CLI_CATEGORIES,
     CLI_CATEGORY_MAP,
+    AnalysisCandidate,
+    AnalysisResult,
+    AppliedParams,
     AutoRemovalCandidate,
     CleanResult,
     RemovalEntry,
@@ -35,6 +39,8 @@ from autoclip.processing.finecut import (
 )
 from autoclip.processing.prompts import build_cleanup_prompt
 from autoclip.providers.registry import create_asr_provider, create_llm_provider
+from autoclip.reporting.analysis import write_analysis_json
+from autoclip.reporting.html import generate_report_html
 from autoclip.utils import format_duration, format_timestamp, setup_logging
 
 console = Console()
@@ -124,8 +130,8 @@ def _build_clean_result(
 
 
 def _print_preview(
-    all_candidates: list[AutoRemovalCandidate],
-    applied_removals: list[AutoRemovalCandidate],
+    all_candidates: Sequence[AutoRemovalCandidate],
+    applied_removals: Sequence[AutoRemovalCandidate],
     original_duration: float,
     cleaned_duration: float,
 ) -> None:
@@ -165,11 +171,18 @@ def _print_preview(
     )
 
 
-def _print_export_summary(result: CleanResult, output_path: str, json_path: str) -> None:
+def _print_export_summary(
+    result: CleanResult,
+    output_path: str,
+    json_path: str,
+    report_path: str | None = None,
+) -> None:
     """Print post-export summary."""
     console.print("\n[bold green]Export complete![/bold green]\n")
     console.print(f"  Output:    {output_path}")
     console.print(f"  Report:    {json_path}")
+    if report_path:
+        console.print(f"  HTML:      {report_path}")
     console.print(
         f"  Duration:  {format_duration(result.original_duration_sec)} -> "
         f"{format_duration(result.cleaned_duration_sec)} "
@@ -193,6 +206,7 @@ def main() -> None:
 @click.option("--categories", default=None, help="Comma-separated categories: filler,repeat,false-start,pause")
 @click.option("--llm", "llm_provider", default=None, help="LLM provider: ollama or openai")
 @click.option("--preview", is_flag=True, help="Analyze only, no export")
+@click.option("--report", is_flag=True, help="Generate HTML analysis report")
 @click.option("-v", "--verbose", is_flag=True, help="Verbose logging")
 def clean(
     input_path: str,
@@ -201,6 +215,7 @@ def clean(
     categories: str | None,
     llm_provider: str | None,
     preview: bool,
+    report: bool,
     verbose: bool,
 ) -> None:
     """Clean a video by removing disfluencies.
@@ -304,7 +319,7 @@ def clean(
         )
 
         # LLM classification
-        llm_candidates: list[AutoRemovalCandidate] = []
+        llm_candidates: list[AnalysisCandidate] = []
         if words:
             with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console, transient=True) as progress:
                 progress.add_task("Classifying disfluencies...", total=None)
@@ -328,6 +343,20 @@ def clean(
             categories=cat_list,
         )
 
+        # Build AnalysisResult
+        effective_categories = cat_list if cat_list is not None else list(ALL_CLI_CATEGORIES)
+        analysis_result = AnalysisResult(
+            source=input_path,
+            original_duration_sec=meta.duration_sec,
+            detected_language=detected_language,
+            words=tuple(words_with_pauses),
+            candidates=tuple(all_candidates),
+            applied_params=AppliedParams(
+                threshold=effective_threshold,
+                categories=effective_categories,
+            ),
+        )
+
         # Edge case: no disfluencies
         if not applied_removals:
             console.print("[green]No disfluencies detected. Your video is already clean![/green]")
@@ -345,14 +374,31 @@ def clean(
             detected_language=detected_language,
         )
 
+        # Determine output dir and stem
+        out_dir = config.output.dir
+        stem = Path(video_path).stem
+        analysis_json_path = os.path.join(out_dir, f"{stem}_analysis.json")
+
         if preview:
             cleaned_duration = sum(s.end_sec - s.start_sec for s in segments)
             _print_preview(all_candidates, applied_removals, meta.duration_sec, cleaned_duration)
+            # Write analysis JSON in preview mode too
+            os.makedirs(out_dir, exist_ok=True)
+            write_analysis_json(analysis_result, analysis_json_path)
+            console.print(f"  Analysis:  {analysis_json_path}")
+            # Generate HTML report if requested
+            if report:
+                report_path = os.path.join(out_dir, f"{stem}_report.html")
+                video_abs = os.path.abspath(video_path)
+                report_abs = os.path.abspath(report_path)
+                video_rel = os.path.relpath(video_abs, os.path.dirname(report_abs))
+                html_content = generate_report_html(analysis_result, video_rel)
+                with open(report_path, "w", encoding="utf-8") as f:
+                    f.write(html_content)
+                console.print(f"  HTML:      {report_path}")
             return
 
         # Export
-        out_dir = config.output.dir
-        stem = Path(video_path).stem
         ext = Path(video_path).suffix
         output_path = os.path.join(out_dir, f"{stem}_clean{ext}")
         json_path = os.path.join(out_dir, f"{stem}_clean.json")
@@ -366,7 +412,21 @@ def clean(
         with open(json_path, "w") as f:
             f.write(result.model_dump_json(indent=2))
 
-        _print_export_summary(result, output_path, json_path)
+        # Write analysis JSON
+        write_analysis_json(analysis_result, analysis_json_path)
+
+        # Generate HTML report if requested
+        report_path: str | None = None
+        if report:
+            report_path = os.path.join(out_dir, f"{stem}_report.html")
+            video_abs = os.path.abspath(video_path)
+            report_abs = os.path.abspath(report_path)
+            video_rel = os.path.relpath(video_abs, os.path.dirname(report_abs))
+            html_content = generate_report_html(analysis_result, video_rel)
+            with open(report_path, "w", encoding="utf-8") as f:
+                f.write(html_content)
+
+        _print_export_summary(result, output_path, json_path, report_path)
 
     finally:
         # Cleanup temp audio
