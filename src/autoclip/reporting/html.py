@@ -36,8 +36,8 @@ def generate_report_html(
 
 def _build_html(data_json: str, video_relative_path: str) -> str:
     """Build the full HTML document with embedded data and styles."""
-    # Escape for embedding in JS
-    escaped_video_path = json.dumps(video_relative_path)
+    # Escape for safe embedding inside <script> tags
+    escaped_video_path = json.dumps(video_relative_path).replace("</", "<\\/")
 
     return f"""<!DOCTYPE html>
 <html lang="en">
