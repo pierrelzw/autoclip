@@ -227,7 +227,7 @@ def _js() -> str:
     html += '<div class="stat-item"><div class="label">Original</div><div class="value">' + fmtTime(originalDur) + '</div></div>';
     html += '<div class="stat-item"><div class="label">Cleaned</div><div class="value">' + fmtTime(cleanedDur) + '</div></div>';
     html += '<div class="stat-item"><div class="label">Reduction</div><div class="value">' + reductionPct.toFixed(1) + '%</div></div>';
-    html += '<div class="stat-item"><div class="label">Language</div><div class="value">' + (data.detected_language || 'unknown') + '</div></div>';
+    html += '<div class="stat-item"><div class="label">Language</div><div class="value">' + escHtml(data.detected_language || 'unknown') + '</div></div>';
     html += '<div class="stat-item"><div class="label">Threshold</div><div class="value">' + threshold + '</div></div>';
     html += '<div class="stat-item"><div class="label">Words</div><div class="value">' + words.length + '</div></div>';
     Object.keys(catCounts).sort().forEach(cat => {

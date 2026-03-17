@@ -193,6 +193,22 @@ def _print_export_summary(
         console.print(f"  Removals:  {', '.join(parts)}")
 
 
+def _resolve_video_path_for_report(
+    video_path: str, report_path: str, downloaded: bool
+) -> str:
+    """Return a video path suitable for the HTML report.
+
+    For downloaded (URL) inputs the temp file will be deleted after the
+    pipeline finishes, so the video preview cannot work.  Return an empty
+    string so the report shows a graceful fallback instead of a broken link.
+    """
+    if downloaded:
+        return ""
+    video_abs = os.path.abspath(video_path)
+    report_abs = os.path.abspath(report_path)
+    return os.path.relpath(video_abs, os.path.dirname(report_abs))
+
+
 @click.group()
 @click.version_option()
 def main() -> None:
@@ -357,9 +373,22 @@ def clean(
             ),
         )
 
-        # Edge case: no disfluencies
+        # Edge case: no disfluencies — still write analysis artifacts before exiting
         if not applied_removals:
+            out_dir = config.output.dir
+            stem = Path(video_path).stem
+            os.makedirs(out_dir, exist_ok=True)
+            analysis_json_path = os.path.join(out_dir, f"{stem}_analysis.json")
+            write_analysis_json(analysis_result, analysis_json_path)
             console.print("[green]No disfluencies detected. Your video is already clean![/green]")
+            console.print(f"  Analysis:  {analysis_json_path}")
+            if report:
+                report_path = os.path.join(out_dir, f"{stem}_report.html")
+                video_src = _resolve_video_path_for_report(video_path, report_path, downloaded)
+                html_content = generate_report_html(analysis_result, video_src)
+                with open(report_path, "w", encoding="utf-8") as f:
+                    f.write(html_content)
+                console.print(f"  HTML:      {report_path}")
             sys.exit(0)
 
         # Merge segments
@@ -389,10 +418,8 @@ def clean(
             # Generate HTML report if requested
             if report:
                 report_path = os.path.join(out_dir, f"{stem}_report.html")
-                video_abs = os.path.abspath(video_path)
-                report_abs = os.path.abspath(report_path)
-                video_rel = os.path.relpath(video_abs, os.path.dirname(report_abs))
-                html_content = generate_report_html(analysis_result, video_rel)
+                video_src = _resolve_video_path_for_report(video_path, report_path, downloaded)
+                html_content = generate_report_html(analysis_result, video_src)
                 with open(report_path, "w", encoding="utf-8") as f:
                     f.write(html_content)
                 console.print(f"  HTML:      {report_path}")
@@ -419,10 +446,8 @@ def clean(
         report_path: str | None = None
         if report:
             report_path = os.path.join(out_dir, f"{stem}_report.html")
-            video_abs = os.path.abspath(video_path)
-            report_abs = os.path.abspath(report_path)
-            video_rel = os.path.relpath(video_abs, os.path.dirname(report_abs))
-            html_content = generate_report_html(analysis_result, video_rel)
+            video_src = _resolve_video_path_for_report(video_path, report_path, downloaded)
+            html_content = generate_report_html(analysis_result, video_src)
             with open(report_path, "w", encoding="utf-8") as f:
                 f.write(html_content)
 
