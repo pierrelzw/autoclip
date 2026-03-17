@@ -42,12 +42,14 @@ class MLXWhisperProvider:
         beam_size: int = 5,
         vad_filter: bool = True,
         min_silence_duration_ms: int = 500,
+        hallucination_threshold: float = 0.9,
     ) -> None:
         self._model_size = model_size
         self._model_repo = _resolve_model_repo(model_size)
         self._beam_size = beam_size
         self._vad_filter = vad_filter
         self._min_silence_duration_ms = min_silence_duration_ms
+        self._hallucination_threshold = hallucination_threshold
         self._loaded = False
 
     def transcribe(
@@ -88,7 +90,9 @@ class MLXWhisperProvider:
         raw_segments: list[dict[str, Any]] = result.get("segments", [])
 
         # Post-filter: remove hallucinations
-        filtered = _filter_hallucinations(raw_segments)
+        filtered = _filter_hallucinations(
+            raw_segments, no_speech_threshold=self._hallucination_threshold,
+        )
 
         # Convert to our models
         caption_segments = _to_caption_segments(filtered)
@@ -102,19 +106,49 @@ class MLXWhisperProvider:
         return caption_segments, detected_language
 
 
-def _filter_hallucinations(segments: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Remove hallucinated segments: duplicates and high no_speech_prob."""
+def _filter_hallucinations(
+    segments: list[dict[str, Any]],
+    no_speech_threshold: float = 0.9,
+) -> list[dict[str, Any]]:
+    """Remove hallucinated segments: duplicates and high no_speech_prob.
+
+    Args:
+        segments: Raw mlx-whisper segment dicts.
+        no_speech_threshold: Segments with no_speech_prob above this are dropped.
+            Default 0.9 — only catches near-certain hallucinations.
+    """
     filtered: list[dict[str, Any]] = []
     prev_text: str | None = None
 
     for seg in segments:
         text = str(seg.get("text", "")).strip()
         no_speech_prob = float(seg.get("no_speech_prob", 0.0))
+        start = float(seg.get("start", 0.0))
+        end = float(seg.get("end", 0.0))
 
         # Filter: high no-speech probability
+        if no_speech_prob > no_speech_threshold:
+            # Keep if segment has real word content (multiple words = real speech)
+            words: list[dict[str, Any]] = seg.get("words", [])
+            if len(words) >= 2:
+                logger.info(
+                    "Kept segment [%.1fs-%.1fs] despite high no_speech_prob=%.2f "
+                    "(has %d words): %s",
+                    start, end, no_speech_prob, len(words), text,
+                )
+            else:
+                logger.info(
+                    "Filtered hallucination [%.1fs-%.1fs] no_speech_prob=%.2f: %s",
+                    start, end, no_speech_prob, text,
+                )
+                continue
+
+        # Log segments that would have been filtered by the old 0.6 threshold
         if no_speech_prob > 0.6:
-            logger.debug("Filtered hallucination (no_speech_prob=%.2f): %s", no_speech_prob, text)
-            continue
+            logger.debug(
+                "Kept segment [%.1fs-%.1fs] no_speech_prob=%.2f (above old 0.6 threshold): %s",
+                start, end, no_speech_prob, text,
+            )
 
         # Filter: consecutive duplicate text
         if text == prev_text:

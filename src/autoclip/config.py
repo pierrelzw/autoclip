@@ -24,6 +24,7 @@ class ASRConfig(BaseModel, frozen=True):
     vad_filter: bool = True
     beam_size: int = 5
     min_silence_duration_ms: int = 500
+    hallucination_threshold: float = Field(default=0.9, ge=0.0, le=1.0)
 
 
 class LLMConfig(BaseModel, frozen=True):

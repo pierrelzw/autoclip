@@ -21,7 +21,7 @@ from autoclip.config import (
 class TestDefaults:
     def test_default_asr(self) -> None:
         cfg = ASRConfig()
-        assert cfg.provider == "whisper"
+        assert cfg.provider == "auto"
         assert cfg.model == "large-v3"
         assert cfg.language == "auto"
         assert cfg.vad_filter is True

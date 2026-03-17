@@ -33,16 +33,69 @@ def _make_word(text: str, start: float, end: float, prob: float = 0.9) -> Simple
 
 
 class TestFilterHallucinations:
-    def test_removes_high_no_speech_prob(self) -> None:
+    def test_removes_high_no_speech_prob_without_words(self) -> None:
+        """High no_speech_prob + 0 words → filtered."""
         segs = [
             _make_segment("hello", 0.0, 1.0, no_speech_prob=0.1),
-            _make_segment("phantom", 1.0, 2.0, no_speech_prob=0.8),
+            _make_segment("phantom", 1.0, 2.0, no_speech_prob=0.95, words=[]),
             _make_segment("world", 2.0, 3.0, no_speech_prob=0.2),
         ]
         filtered = _filter_hallucinations(segs)
         assert len(filtered) == 2
         assert filtered[0].text == "hello"
         assert filtered[1].text == "world"
+
+    def test_removes_high_no_speech_prob_with_single_word(self) -> None:
+        """High no_speech_prob + 1 word → filtered (single-word hallucination)."""
+        segs = [
+            _make_segment("hello", 0.0, 1.0, no_speech_prob=0.1),
+            _make_segment(
+                "字幕", 1.0, 2.0, no_speech_prob=0.95,
+                words=[_make_word("字幕", 1.0, 1.5)],
+            ),
+            _make_segment("world", 2.0, 3.0, no_speech_prob=0.2),
+        ]
+        filtered = _filter_hallucinations(segs)
+        assert len(filtered) == 2
+        assert filtered[0].text == "hello"
+        assert filtered[1].text == "world"
+
+    def test_keeps_high_no_speech_prob_with_multiple_words(self) -> None:
+        """High no_speech_prob + multiple words → kept (real speech)."""
+        words = [
+            _make_word("大家", 1.0, 1.3),
+            _make_word("好", 1.3, 1.5),
+            _make_word("欢迎", 1.5, 1.8),
+        ]
+        segs = [
+            _make_segment("hello", 0.0, 1.0, no_speech_prob=0.1),
+            _make_segment("大家好欢迎", 1.0, 2.0, no_speech_prob=0.99, words=words),
+            _make_segment("world", 2.0, 3.0, no_speech_prob=0.2),
+        ]
+        filtered = _filter_hallucinations(segs)
+        assert len(filtered) == 3
+        assert filtered[1].text == "大家好欢迎"
+
+    def test_keeps_moderate_no_speech_prob(self) -> None:
+        """Segments with no_speech_prob between 0.6-0.9 should be kept (not hallucinations)."""
+        segs = [
+            _make_segment("real speech", 0.0, 1.0, no_speech_prob=0.7),
+            _make_segment("also real", 1.0, 2.0, no_speech_prob=0.85),
+        ]
+        filtered = _filter_hallucinations(segs)
+        assert len(filtered) == 2
+
+    def test_custom_threshold(self) -> None:
+        segs = [
+            _make_segment("hello", 0.0, 1.0, no_speech_prob=0.1),
+            _make_segment("borderline", 1.0, 2.0, no_speech_prob=0.75),
+        ]
+        # With low threshold, borderline gets filtered
+        filtered = _filter_hallucinations(segs, no_speech_threshold=0.7)
+        assert len(filtered) == 1
+        # With default threshold, borderline is kept
+        filtered = _filter_hallucinations(segs)
+        assert len(filtered) == 2
 
     def test_removes_consecutive_duplicates(self) -> None:
         segs = [
