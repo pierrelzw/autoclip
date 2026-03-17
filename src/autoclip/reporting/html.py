@@ -137,7 +137,7 @@ def _js() -> str:
     const candidates = data.candidates || [];
     const words = data.words || [];
     const params = data.applied_params || {};
-    const threshold = params.threshold || 0.7;
+    const threshold = params.threshold ?? 0.7;
     const categories = params.categories || [];
     const categoryMap = {
         'stutter': 'repeat', 'repeat': 'repeat', 'filler': 'filler',

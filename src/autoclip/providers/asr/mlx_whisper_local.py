@@ -129,7 +129,7 @@ def _filter_hallucinations(
         # Filter: high no-speech probability
         if no_speech_prob > no_speech_threshold:
             # Keep if segment has real word content (multiple words = real speech)
-            words: list[dict[str, Any]] = seg.get("words", [])
+            words: list[dict[str, Any]] = seg.get("words") or []
             if len(words) >= 2:
                 logger.info(
                     "Kept segment [%.1fs-%.1fs] despite high no_speech_prob=%.2f "
